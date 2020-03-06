@@ -204,7 +204,7 @@ class Mux(object):
             print(np.diff(fs))
             raise Exception('fs_in_fiber of the signal must be the same')
 
-        length = np.array([len(signal),for signal in signals])
+        length = np.array([len(signal) for signal in signals])
 
         if relative_freq is None:
             relative_freq = np.array(freqs) - (np.max(freqs) + np.min(freqs)) / 2
