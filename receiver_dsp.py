@@ -6,6 +6,25 @@ import numba
 import matplotlib.pyplot as plt
 from .signal_define import Signal
 from typing import List
+def syncsignal_tx2rx(symbol_rx, symbol_tx):
+    from scipy.signal import correlate
+
+    symbol_tx = np.atleast_2d(symbol_tx)
+    symbol_rx = np.atleast_2d(symbol_rx)
+    out = np.zeros_like(symbol_tx)
+    # assert sample_rx.ndim == 1
+    # assert symbol_tx.ndim == 1
+    assert symbol_tx.shape[1] >= symbol_rx.shape[1]
+    for i in range(symbol_tx.shape[0]):
+        symbol_tx_temp = symbol_tx[i, :]
+        sample_rx_temp = symbol_rx[i, :]
+
+        res = correlate(symbol_tx_temp, sample_rx_temp)
+        #plt.plot(np.abs(res))
+        index = np.argmax(np.abs(res))
+
+        out[i] = np.roll(symbol_tx_temp, -index - 1 + sample_rx_temp.shape[0])
+    return out
 
 def cd_compensation(span,signal:Signal,fs):
     '''
@@ -115,21 +134,27 @@ class Equalizer(object):
         freq_res =  fftshift(fft(self.wxx)),fftshift(fft(self.wxy)),fftshift(fft(self.wyx)),fftshift(fft(self.wyy))
         return freq_res
 
-    
-class CMA(Equalizer):
-    
-    
-    def __init__(self,ntaps,lr,loops=3):
-        super().__init__(ntaps,lr,loops)
-       
-        
-    
-    def equalize(self,signal):
+
+    def init_samples(self, signal):
         signal.cpu()
         import numpy as np
             
         samples_xpol = _segment_axis(signal[0],self.ntaps, self.ntaps-signal.sps)
         samples_ypol = _segment_axis(signal[1],self.ntaps, self.ntaps-signal.sps)
+
+        return samples_xpol,samples_ypol
+
+
+class CMA(Equalizer):
+    
+    
+    def __init__(self,ntaps,lr,loops=3,reference_power=1):
+        super().__init__(ntaps,lr,loops)
+        self.reference_power = reference_power
+        
+    
+    def equalize(self,signal):
+        samples_xpol,samples_ypol = self.init_samples(signal)
         
         self.error_xpol_array = np.zeros((self.loops,len(samples_xpol)))
         self.error_ypol_array = np.zeros((self.loops,len(samples_xpol)))
@@ -138,7 +163,7 @@ class CMA(Equalizer):
             symbols, self.wxx, self.wxy, self.wyx, \
             self.wyy, error_xpol_array, error_ypol_array \
             = cma_equalize_core(samples_xpol,samples_ypol,\
-                                self.wxx,self.wyy,self.wxy,self.wyx,self.lr)
+                                self.wxx,self.wyy,self.wxy,self.wyx,self.lr,self.reference_power)
             
             self.error_xpol_array[idx] = np.abs(error_xpol_array[0])**2
             self.error_ypol_array[idx] = np.abs(error_ypol_array[0])**2

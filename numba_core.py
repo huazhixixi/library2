@@ -12,7 +12,7 @@ cma_core_type = \
     [(complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], double)]
 
 @numba.njit(cma_core_type, cache=True)
-def cma_equalize_core(ex, ey, wxx, wyy, wxy, wyx, mu):
+def cma_equalize_core(ex, ey, wxx, wyy, wxy, wyx, mu, reference_power):
     # symbols = np.zeros((1,ex.shape[0]),dtype=np.complex128)
     symbols = np.zeros((2, ex.shape[0]), dtype=np.complex128)
 
@@ -26,8 +26,8 @@ def cma_equalize_core(ex, ey, wxx, wyy, wxy, wyx, mu):
         yout = np.sum(wyx * xx) + np.sum(wyy * yy)
         symbols[0, idx] = xout
         symbols[1, idx] = yout
-        error_xpol = 1 - np.abs(xout) ** 2
-        error_ypol = 1 - np.abs(yout) ** 2
+        error_xpol = reference_power - np.abs(xout) ** 2
+        error_ypol = reference_power - np.abs(yout) ** 2
         error_xpol_array[0, idx] = error_xpol
         error_xpol_array[0, idx] = error_ypol
         wxx = wxx + mu * error_xpol * xout * np.conj(xx)
