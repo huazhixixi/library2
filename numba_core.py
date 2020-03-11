@@ -9,7 +9,7 @@ import numpy as np
 
 from numba import complex128,double
 cma_core_type = \
-    [(complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], double)]
+    [(complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], complex128[:, :], double,double)]
 
 @numba.njit(cma_core_type, cache=True)
 def cma_equalize_core(ex, ey, wxx, wyy, wxy, wyx, mu, reference_power):
