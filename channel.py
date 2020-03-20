@@ -4,7 +4,7 @@ from scipy.fft import fft, ifft, fftfreq
 
 from scipy.constants import c
 
-from library import QamSignal
+from .signal_define import QamSignal
 
 
 class AwgnChannel(object):
