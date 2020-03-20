@@ -4,6 +4,8 @@ from scipy.fft import fft, ifft, fftfreq
 
 from scipy.constants import c
 
+from library import QamSignal
+
 
 class AwgnChannel(object):
 
@@ -236,3 +238,44 @@ class NonlinearFiber(Fiber):
 
     def linear_prop_af(self,signal):
         raise NotImplementedError
+
+class LinearFiber(Fiber):
+    '''
+        property:
+            self.alpha  [db/km]
+            self.D [ps/nm/km]
+            self.length [km]
+            self.reference_wave_length:[nm]
+            self.beta2: caculate beta2 from D,s^2/km
+            self.slope: derivative of self.D ps/nm^2/km
+            self.beta3_reference: s^3/km
+        method:
+            __call__: the signal will
+    '''
+
+    def __init__(self, alpha, D, length, slope=0, reference_wavelength=1550):
+        super(LinearFiber, self).__init__(alpha,D,length,reference_wavelength,slope,None)
+
+
+    def prop(self, signal:QamSignal):
+        '''
+        :param signal: signal object to propagation across this fiber
+        :return: ndarray
+        '''
+        center_lambda = signal.center_wavelength
+
+        after_prop = np.zeros_like(signal[:])
+        for pol in range(0, signal.pol_number):
+            sample = signal[pol, :]
+            sample_fft = fft(sample)
+            freq = fftfreq(signal[:].shape[1], 1 / signal.fs_in_fiber)
+            omeg = 2 * np.pi * freq
+
+            after_prop[pol, :] = sample_fft * np.exp(-self.alphalin * self.length / 2)
+            after_prop[pol, :] = ifft(after_prop[pol, :])
+
+            disp = np.exp(-1j / 2 * self.beta2(center_lambda) * omeg ** 2 * self.length)
+            after_prop[pol, :] = ifft(fft(after_prop[pol, :]) * disp)
+
+        signal.samples = after_prop
+        return signal

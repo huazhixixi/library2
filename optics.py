@@ -378,6 +378,9 @@ class ConstantGainEdfa(Edfa):
     def prop(self,signal):
         if signal.is_on_cuda:
             self.cuda()
+        else:
+            import numpy as np
+            self.np= np
         super(ConstantGainEdfa, self).prop(signal=signal)
         return signal
 
