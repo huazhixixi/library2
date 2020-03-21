@@ -432,6 +432,11 @@ class WdmSignal(object):
         from scipy.constants import  c
         return c/self.center_freq
 
+
+    @property
+    def center_wavelength(self):
+        return self.wavelength
+
     @property
     def length(self):
         if self.is_on_cuda:
