@@ -29,7 +29,8 @@ class Signal(object):
         self.number = kwargs.get('number', 0)
         self.mf = kwargs.get('mf', 'dp-qpsk')
         self.roll_off = 0.02
-
+        self.is_on = True
+        self.current_ase = 0
     @property
     def bch(self):
         return self.baud_rate * (1 + self.roll_off)
@@ -39,7 +40,7 @@ class Signal(object):
         '''
         :return:信号的功率谱密度， 信号功率/信号带宽
         '''
-        return self.signal / self.bch  # w/hz
+        return (self.signal) / self.baud_rate  # w/hz
 
     @property
     def ase_psd(self):
@@ -97,9 +98,11 @@ class Span(object):
         :return: None
         线性传输，也就是功率衰减
         '''
+        signal.current_ase = signal.current_ase * np.exp(-2 * self.alpha_lin * self.length)
 
         signal.signal = signal.signal * np.exp(-2 * self.alpha_lin * self.length)
         signal.ase = signal.ase * np.exp(-2 * self.alpha_lin * self.length)
+        signal.nli = signal.nli * np.exp(-2 * self.alpha_lin * self.length)
 
     def prop(self, signal: Signal, signals: List[Signal]):
         '''

@@ -105,9 +105,9 @@ class WSS(object):
     def oft(self,value):
         self.__oft = value/1e9
 
-    def prop(self, signal):
-
-        sample = signal[:]
+    def prop(self, signal,inplace = True):
+        import copy
+        sample = copy.deepcopy(signal[:])
         self.is_on_cuda = signal.is_on_cuda
 
         if self.is_on_cuda:
@@ -124,9 +124,12 @@ class WSS(object):
 
         for i in range(sample.shape[0]):
             sample[i, :] = np.fft.ifft(np.fft.fft(sample[i, :]) * self.H)
-
-        signal[:] = sample
-        return signal
+            sample[i, np.abs(self.freq) >= self.bandwidth/2] = 0
+        if inplace:
+            signal[:] = sample
+            return signal
+        else:
+            return sample
 
     def __get_transfer_function(self, freq_vector):
         if self.is_on_cuda:
@@ -188,7 +191,7 @@ class WSS(object):
 class Mux(object):
 
     @staticmethod
-    def mux_signal(signals, center_freq=None, relative_freq=None, wdm_comb_config=None):
+    def mux_signal(signals, center_freq=None, relative_freq=None, wdm_comb_config=None)->WdmSignal:
         if signals[0].is_on_cuda:
             import cupy as np
         else:

@@ -368,11 +368,11 @@ class WdmSignal(object):
         if self.is_on_cuda:
             self.cpu()
 
-            plt.psd(self[0], NFFT=16384, Fs=self.fs_in_fiber, window=np.hamming(16384))
+            plt.psd(self[0], NFFT=16384, Fs=self.fs_in_fiber)
             plt.show()
             self.cuda()
         else:
-            plt.psd(self[0], NFFT=16384, Fs=self.fs_in_fiber, window=np.hamming(16384))
+            plt.psd(self[0], NFFT=16384, Fs=self.fs_in_fiber)
             plt.show()
 
     @property
@@ -431,6 +431,10 @@ class WdmSignal(object):
     def wavelength(self):
         from scipy.constants import  c
         return c/self.center_freq
+
+    @property
+    def pol_number(self):
+        return self.wdm_samples.shape[0]
 
 
     @property
