@@ -5,6 +5,7 @@ from numpy import arcsinh
 from typing import List
 
 import matplotlib.pyplot as plt
+from scipy.io import loadmat
 
 
 class Signal(object):
@@ -30,7 +31,19 @@ class Signal(object):
         self.mf = kwargs.get('mf', 'dp-qpsk')
         self.roll_off = 0.02
         self.is_on = True
-        self.current_ase = 0
+        self.signal_power_each_oms = []
+        self.snr_each_oms = []
+        self.ase_noise_each_oms =[]
+        self.snr_ase_each_oms = []
+        self.nli_noise_each_oms = []
+        self.snr_nli_each_oms = []
+
+        self.snr_ase_each_oms_model = []
+        self.snr_nli_each_oms_model = []
+        self.snr_each_oms_model = []
+
+        self.ith_oms = 0
+
     @property
     def bch(self):
         return self.baud_rate * (1 + self.roll_off)
@@ -98,7 +111,10 @@ class Span(object):
         :return: None
         线性传输，也就是功率衰减
         '''
-        signal.current_ase = signal.current_ase * np.exp(-2 * self.alpha_lin * self.length)
+        #signal.current_ase = signal.current_ase * np.exp(-2 * self.alpha_lin * self.length)
+        if signal.ith_oms:
+            signal.ase_noise_each_oms =   (np.array(signal.ase_noise_each_oms) * np.exp(-2 * self.alpha_lin * self.length)).tolist()
+            signal.nli_noise_each_oms =   (np.array(signal.nli_noise_each_oms) * np.exp(-2 * self.alpha_lin * self.length)).tolist()
 
         signal.signal = signal.signal * np.exp(-2 * self.alpha_lin * self.length)
         signal.ase = signal.ase * np.exp(-2 * self.alpha_lin * self.length)
@@ -177,8 +193,8 @@ class Edfa(object):
         signal.ase = signal.ase * self.gain_lin  # 之前EDFA产生的ase先被放大
         signal.ase += self.ase(signal) * signal.baud_rate
         signal.signal = signal.signal * self.gain_lin  # 信号功率放大
-
-        # signal.nli = signal.nli*self.gain_lin
+        # signal.nli
+        signal.nli = signal.nli*self.gain_lin
 
 
 class Fiber(object):
@@ -232,7 +248,32 @@ def test_flex_rate():
     return frequence
 
 
+class RealEdfa:
 
+    def __init__(self,ith_span):
+        self.gain = loadmat(r'C:\Users\shang\PycharmProjects\adddrop\gain.mat')['gain']
+        self.nf = loadmat(r'C:\Users\shang\PycharmProjects\adddrop\nf.mat')['nf']
+
+        self.gain = self.gain.T[ith_span]
+        self.nf = self.nf.T[ith_span]
+
+    def prop(self,signal:Signal,ith_signal):
+
+        nf_lin = 10 ** (self.nf[ith_signal] / 10)
+        gain_lin = 10 ** (self.gain[ith_signal] / 10)
+        #signal.current_ase = gain_lin*signal.current_ase
+        signal.ase = signal.ase * gain_lin
+        ase_psd = (h * signal.carri) * (gain_lin * nf_lin - 1) / 2
+        signal.signal = gain_lin * signal.signal
+
+        if signal.ith_oms:
+            signal.ase_noise_each_oms = (np.array( signal.ase_noise_each_oms) * gain_lin).tolist()
+            signal.nli_noise_each_oms = (np.array(signal.nli_noise_each_oms )* gain_lin).tolist()
+
+
+
+        signal.ase += 2*ase_psd*signal.baud_rate
+        signal.nli = signal.nli * gain_lin
 
 
 

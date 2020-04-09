@@ -1,17 +1,16 @@
 class Resampler(object):
 
     @staticmethod
-    def prop(signal, new_fs):
+    def prop(signal, new_sps):
 
         if signal.is_on_cuda:
             import cusignal
-            signal.samples = cusignal.resample_poly(signal[:], 1, signal.fs_in_fiber / new_fs, axis=-1)
+            signal.samples = cusignal.resample_poly(signal[:], signal.sps, new_sps, axis=-1)
         else:
             import resampy
-            signal.samples = resampy.resample(signal[:], signal.fs_in_fiber, new_fs, axis=-1, filter='kaiser_fast')
+            signal.samples = resampy.resample(signal[:], signal.sps, new_sps, axis=-1, filter='kaiser_fast')
 
-        signal.sps = new_fs / signal.baudrate
-        signal.sps = int(signal.sps)
+        signal.sps = new_sps
         return signal
 
 
