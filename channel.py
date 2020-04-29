@@ -6,6 +6,124 @@ from scipy.constants import c
 
 from .signal_define import QamSignal
 
+class NonlinearFiberNew(Fiber):
+
+    def __init__(self, signal_bandwidth, alpha=0.2, D=16.7, length=80,
+                 reference_wavelength=1550, slope=0, accuracy='single', gamma=1.3, fwm_limitation=4):
+        super().__init__(alpha, D, length, reference_wavelength, slope, accuracy)
+        self.gamma = gamma
+        self.fwm_limitation = fwm_limitation
+        self.bw = signal_bandwidth
+
+        self.transimitted_length = 0
+
+    def init(self, signal):
+        try:
+            from cupyx.scipy.fft import fft
+            from cupyx.scipy.fft import ifft
+            from cupyx.scipy.fft import get_fft_plan
+            from cupyx.scipy.fft import fftfreq
+            import cupy as np
+            self.fft = fft
+            self.ifft = ifft
+            self.plan = get_fft_plan
+            self.fftfreq = fftfreq
+            self.np = np
+        except ImportError:
+            import numpy as np
+            from scipy.fft import fft, ifft, fftfreq
+            self.np = np
+            self.fft = fft
+            self.ifft = ifft
+            self.fftfreq = fftfreq
+
+            class Plan:
+                def __enter__(self):
+                    pass
+
+                def __exit__(self, exc_type, exc_val, exc_tb):
+                    pass
+
+            self.plan = Plan()
+
+        freq = self.fftfreq(signal.shape[1], 1 / signal.fs_in_fiber)
+        omeg = 2 * self.np.pi * freq
+        self.linear_op = -1j / 2 * self.beta2(signal.wavelength) * omeg ** 2
+        self.N = 8 / 9 * 1j * self.gamma
+        self.step = self.fwm_limitation / self.np.abs(self.beta2(signal.center_wavelength)) / ((
+                2 * self.np.pi * self.bw) ** 2)
+        if self.accuracy.lower() == 'single':
+            signal.to_32complex()
+
+            self.linear_op = self.np.array(self.linear_op, dtype=self.np.complex64)
+            self.N = np.array(self.N,dtype=self.np.complex64)
+            self.step = self.np.array(self.step,dtype=self.np.float32)
+
+        self.peak_power = self.np.max(self.np.abs(signal[0]) ** 2 + self.np.abs(signal[1]) ** 2)
+
+    def update_step(self):
+        step_eff_next = self.np.exp(self.alphalin*self.step)*self.leff(self.step)
+        step_next = self.np.log(1 - step_eff_next * self.alphalin) / (-self.alphalin)
+
+        if self.transimitted_length + step_next > self.length or step_next > self.length or np.isnan(step_next):
+            self.step = self.length - self.transimitted_length
+        else:
+            self.step = self.np.log(1 - step_eff_next * self.alphalin) / (-self.alphalin)
+
+    def prop(self, signal):
+        signal.cuda()
+        self.init(signal)
+
+        atten = -self.alphalin / 2
+
+        while self.transimitted_length < self.length:
+            signal = self.linear_prop(signal)
+            signal = self.nonlinear_prop(signal)
+
+            signal[0] = signal[0] * self.np.exp(atten * self.step / 2)
+            signal[1] = signal[1] * self.np.exp(atten * self.step / 2)
+
+            signal[0], signal[1] = self.linear_prop(signal)
+            signal[0] = signal[0] * self.np.exp(atten * self.step / 2)
+            signal[1] = signal[1] * self.np.exp(atten * self.step / 2)
+            self.transimitted_length+=self.step
+            self.update_step()
+
+        return signal
+
+    def linear_prop(self, signal):
+        timex = signal[0]
+        timey = signal[1]
+
+        if callable(self.plan):
+            self.plan = self.plan(timex, shape=timex.shape, axes=-1)
+        with self.plan:
+            freq_x = self.fft(timex, overwrite_x=True)
+            freq_y = self.fft(timey, overwrite_x=True)
+
+            freq_x = freq_x * self.np.exp(self.linear_op * self.step/2)
+            freq_y = freq_y * self.np.exp(self.linear_op * self.step/2)
+
+            time_x = self.ifft(freq_x, overwrite_x=True)
+            time_y = self.ifft(freq_y, overwrite_x=True)
+
+            signal[0] = time_x
+            signal[1] = time_y
+        return signal
+
+    def nonlinear_prop(self, signal):
+        step_eff = self.leff(self.step)
+        time_x = signal[0]
+        time_y = signal[1]
+        time_x = time_x * self.np.exp(
+            self.N * step_eff * (self.np.abs(time_x) ** 2 + self.np.abs(
+                time_y) ** 2))
+        time_y = time_y * self.np.exp(
+            self.N * step_eff * (self.np.abs(time_x) ** 2 + self.np.abs(time_y) ** 2))
+
+        signal[0] = time_x
+        signal[1] = time_y
+        return signal
 
 class AwgnChannel(object):
 
