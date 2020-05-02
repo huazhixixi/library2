@@ -124,7 +124,6 @@ class WSS(object):
 
         for i in range(sample.shape[0]):
             sample[i, :] = np.fft.ifft(np.fft.fft(sample[i, :]) * self.H)
-            sample[i, np.abs(self.freq) >= self.bandwidth/2] = 0
         if inplace:
             signal[:] = sample
             return signal
