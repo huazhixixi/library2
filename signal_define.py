@@ -140,22 +140,22 @@ class Signal(object):
             self.is_on_cuda = False
         return self
 
-    def save_to_mat(self,filename):
-        from scipy.io import savemat
-        flag = 0
-        if self.is_on_cuda:
-            self.cpu()
-            flag = 1
-        savemat(filename,dict(fs = self.fs,fs_in_fiber = self.fs_in_fiber,sps = self.sps,sps_in_fiber = self.sps_in_fiber,baudrate = self.baudrate,
-                              samples_in_fiber = self.samples,symbol_tx = self.symbol))
-        if flag:
-            self.cuda()
+    # def save_to_mat(self,filename):
+    #     from scipy.io import savemat
+    #     flag = 0
+    #     if self.is_on_cuda:
+    #         self.cpu()
+    #         flag = 1
+    #     savemat(filename,dict(fs = self.fs,fs_in_fiber = self.fs_in_fiber,sps = self.sps,sps_in_fiber = self.sps_in_fiber,baudrate = self.baudrate,
+    #                           samples_in_fiber = self.samples,symbol_tx = self.symbol))
+    #     if flag:
+    #         self.cuda()
 
-    def save(self,file_name):
+    def save(self,file_name,is_mat_file = False):
         flag = False
         if self.is_on_cuda:
             self.cpu()
-            flat = True
+            flag = True
         samples_in_fiber = self.ds_in_fiber
         samples = self.ds
         sps = self.sps
@@ -166,15 +166,29 @@ class Signal(object):
         symbol = self.symbol
         freq = self.freq
         import joblib
-        joblib.dump(dict(freq = freq,ds_in_fiber = samples_in_fiber,ds=samples,sps=sps,sps_in_fiber = sps_in_fiber,msg = msg,qamorder = qam_order,baudrate = baudrate,symbol = symbol,symbol_length = self.symbol_length,pol_number = self.pol_number,doinit = False),file_name)
+        data = dict(freq = freq,ds_in_fiber = samples_in_fiber,ds=samples,sps=sps,sps_in_fiber = sps_in_fiber,msg = msg,qamorder = qam_order,baudrate = baudrate,symbol = symbol,symbol_length = self.symbol_length,pol_number = self.pol_number,doinit = False)
+        if not is_mat_file:
+            joblib.dump(data,file_name)
+        else:
+            from scipy.io import savemat
+            savemat(file_name +'.mat',data)
 
         if flag:
             self.cuda()
 
     @classmethod
-    def load(cls,filename):
+    def load(cls,filename,is_mat):
+        from scipy.io import loadmat
         import joblib
-        param = joblib.load(filename)
+        if not is_mat:
+            param = joblib.load(filename)
+        else:
+            param = loadmat(filename)
+            for key in param:
+                if isinstance(param[key],np.ndarray) and param[key].shape ==  (1,1):
+                    param[key] = param[key][0,0]
+
+
         signal = cls(**param)
         signal.samples = param['ds_in_fiber']
         signal.ds = param['ds']
@@ -183,6 +197,10 @@ class Signal(object):
         signal.freq = param['freq']
         return signal
 
+    # @classmethod
+    # def load_from_mat(cls,filename):
+    #     from scipy.io import loadmat
+    #     data  = loadmat
 
     @property
     def wavelength(self):
@@ -212,26 +230,26 @@ class Signal(object):
         power_linear = 10**(power_in_dbm/10)/1000/2
         self[:] = np.sqrt(power_linear) * self[:]
 
-    @classmethod
-    def load_mat(cls,array,sps,sps_in_fiber,tx_symbol,order,baudrate,msg = None,device='cpu'):
-        tx_symbol = np.atleast_2d(tx_symbol)
-        signal = cls(qamorder=order,baudrate = baudrate,sps = sps,sps_in_fiber=sps_in_fiber,symbol_length=tx_symbol.shape[1],pol_number=tx_symbol.shape[0])
-
-        signal.ds = None
-        signal.samples = None
-        signal.message = None
-        signal.symbol = None
-
-        if msg:
-            signal.message = msg
-
-        signal.ds_in_fiber = array
-        signal.symbol = tx_symbol
-        signal.ds = signal.ds_in_fiber
-        if device=='cuda':
-            signal.cuda()
-
-        return signal
+    # @classmethod
+    # def load_mat(cls,array,sps,sps_in_fiber,tx_symbol,order,baudrate,msg = None,device='cpu'):
+    #     tx_symbol = np.atleast_2d(tx_symbol)
+    #     signal = cls(qamorder=order,baudrate = baudrate,sps = sps,sps_in_fiber=sps_in_fiber,symbol_length=tx_symbol.shape[1],pol_number=tx_symbol.shape[0])
+    #
+    #     signal.ds = None
+    #     signal.samples = None
+    #     signal.message = None
+    #     signal.symbol = None
+    #
+    #     if msg:
+    #         signal.message = msg
+    #
+    #     signal.ds_in_fiber = array
+    #     signal.symbol = tx_symbol
+    #     signal.ds = signal.ds_in_fiber
+    #     if device=='cuda':
+    #         signal.cuda()
+    #
+    #     return signal
 
     def to_32complex(self):
         if self.is_on_cuda:

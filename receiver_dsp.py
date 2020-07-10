@@ -342,6 +342,41 @@ class Superscalar(PhaseRecovery):
 
         return cpr_symbols
 
+class LMS_PLL(Equalizer):
+    def __init__(self, g,ntaps, loops, train_iter, lr_train, lr_dd=None):
+        super().__init__(ntaps=ntaps, lr=lr_train,loops=loops)
+        self.train_iter = train_iter
+
+        self.lr_dd = lr_dd
+        self.is_train = True
+        self.g = g
+
+    def equalize(self, signal):
+        signal.cpu()
+        samples_xpol, samples_ypol = self.init_samples(signal)
+        self.error_xpol_array = np.zeros((self.loops, len(samples_xpol)))
+        self.error_ypol_array = np.zeros((self.loops, len(samples_xpol)))
+
+        for idx in range(self.loops):
+
+            if self.train_iter <= 0:
+                self.is_train = False
+
+            symbols, self.wxx, self.wxy, self.wyx, \
+            self.wyy, error_xpol_array, error_ypol_array \
+                = lms_equalize_core_pll(samples_xpol, samples_ypol, self.g,signal.symbol,
+                                    self.wxx, self.wyy, self.wxy, self.wyx, mu_train=self.lr, mu_dd=self.lr_dd,
+                                    is_train=self.is_train)
+
+            self.error_xpol_array[idx] = np.abs(error_xpol_array[0]) ** 2
+            self.error_ypol_array[idx] = np.abs(error_ypol_array[0]) ** 2
+
+        self.equalized_symbols = symbols
+
+        signal.samples = symbols
+        return signal
+
+
 
 def decision(decision_symbols, const):
     decision_symbols = np.atleast_2d(decision_symbols)
@@ -352,3 +387,5 @@ def decision(decision_symbols, const):
             index_min = np.argmin(np.abs(symbol - const))
             res[row_index, index] = const[index_min]
     return res
+
+

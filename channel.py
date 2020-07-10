@@ -357,6 +357,7 @@ class NonlinearFiberNew(Fiber):
         signal[0] = time_x
         signal[1] = time_y
         return signal
+
 class LinearFiber(Fiber):
     '''
         property:
