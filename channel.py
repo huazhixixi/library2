@@ -239,6 +239,7 @@ class NonlinearFiber(Fiber):
 
     def linear_prop_af(self,signal):
         raise NotImplementedError
+
 class NonlinearFiberNew(Fiber):
 
     def __init__(self, signal_bandwidth, alpha=0.2, D=16.7, length=80,
@@ -357,6 +358,7 @@ class NonlinearFiberNew(Fiber):
         signal[0] = time_x
         signal[1] = time_y
         return signal
+
 class LinearFiber(Fiber):
     '''
         property:

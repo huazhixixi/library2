@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .filter_design import rrcos_pulseshaping_freq
-from .utilities import upsampling
+from .tools import upsampling
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 
@@ -300,7 +300,7 @@ class WdmSignal(object):
     def __init__(self, symbols, wdm_samples, freq, is_on_cuda, fs_in_fiber,center_freq,**kwargs):
         self.symbols = symbols
         self.wdm_samples = wdm_samples
-
+        self.samples = self.wdm_samples  # for jianrong xing
         self.relative_freq = freq
         self.is_on_cuda = is_on_cuda
         self.fs_in_fiber = fs_in_fiber
@@ -455,6 +455,7 @@ class WdmSignal(object):
     @property
     def sps_in_fiber(self):
         return self.fs_in_fiber/self.baudrates[0]
+
 
 class DummySignal:
     def __init__(self, samples, baudrate, qam_order, symbol, is_on_cuda, sps):

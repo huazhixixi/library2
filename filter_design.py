@@ -99,3 +99,65 @@ def ideal_lp(samples, left_freq, right_freq, fs, need_fft=True):
         samples = ifft(samples, axis=-1)
 
     return samples
+
+import scipy.fft as scifft
+import scipy.signal as scisig
+def filter_signal(signal, fs, cutoff, ftype="bessel", order=2, analog=False):
+    """
+    Apply an analog filter to a signal for simulating e.g. electrical bandwidth limitation
+    Parameters
+    ----------
+    signal  : array_like
+        input signal array
+    fs      : float
+        sampling frequency of the input signal
+    cutoff  : float
+        3 dB cutoff frequency of the filter
+    ftype   : string, optional
+        filter type can be either a bessel, butter, exp or gauss filter (default=bessel)
+    order   : int
+        order of the filter
+    Returns
+    -------
+    signalout : array_like
+        filtered output signal
+    """
+    sig = np.atleast_2d(signal)
+    if ftype == "gauss":
+        f = np.linspace(-fs/2, fs/2, sig.shape[1], endpoint=False, dtype=sig.dtype)
+        w = cutoff/(2*np.sqrt(2*np.log(2))) # might need to add a factor of 2 here do we want FWHM or HWHM?
+        g = np.exp(-f**2/(2*w**2))
+        fsignal = scifft.fftshift(scifft.fft(scifft.fftshift(sig, axes=-1), axis=-1), axes=-1) * g
+        if signal.ndim == 1:
+            return scifft.fftshift(scifft.ifft(scifft.fftshift(fsignal))).flatten()
+        else:
+            return scifft.fftshift(scifft.ifft(scifft.fftshift(fsignal)))
+    if ftype == "exp":
+        f = np.linspace(-fs/2, fs/2, sig.shape[1], endpoint=False, dtype=sig.dtype)
+        w = cutoff/(np.sqrt(2*np.log(2)**2)) # might need to add a factor of 2 here do we want FWHM or HWHM?
+        g = np.exp(-np.sqrt((f**2/(2*w**2))))
+        g /= g.max()
+        fsignal = scifft.fftshift(scifft.fft(scifft.fftshift(signal))) * g
+        if signal.ndim == 1:
+            return scifft.fftshift(scifft.ifft(scifft.fftshift(fsignal))).flatten()
+        else:
+            return scifft.fftshift(scifft.ifft(scifft.fftshift(fsignal)))
+    Wn = cutoff*2*np.pi if analog else cutoff
+    frmt = "ba" if analog else "sos"
+    fs_in = None if analog else fs
+    if ftype == "bessel":
+        system = scisig.bessel(order, Wn,  'low', norm='mag', analog=analog, output=frmt, fs=fs_in)
+    elif ftype == "butter":
+        system = scisig.butter(order, Wn, 'low',  analog=analog, output=frmt, fs=fs_in)
+    if analog:
+        t = np.arange(0, sig.shape[1])*1/fs
+        sig2 = np.zeros_like(sig)
+        for i in range(sig.shape[0]):
+            to, yo, xo = scisig.lsim(system, sig[i], t)
+            sig2[i] = yo.astype(sig.dtype)
+    else:
+        sig2 = scisig.sosfilt(system.astype(sig.dtype), sig, axis=-1)
+    if signal.ndim == 1:
+        return sig2.flatten()
+    else:
+        return sig2
