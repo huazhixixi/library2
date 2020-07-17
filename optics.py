@@ -301,7 +301,8 @@ class Edfa:
                                               size=signal.shape) + 1j * self.np.random.normal(
                 scale=self.np.sqrt(noise_power_one_poloarization / 2), size=signal.shape)
             signal[:] = signal[:] + noise_sequence
-
+            self.noise_sequence = noise_sequence
+            
     def cuda(self):
         if self.is_on_cuda:
             return
