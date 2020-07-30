@@ -1,7 +1,6 @@
 import numpy as np
-
-
 from .tools import rescale_signal
+
 def quantize_signal_New(sig_in, nbits=6, rescale_in=True, rescale_out=True):
     """
     Function so simulate limited resultion using DACs and ADCs, limit quantization error to (-delta/2,delta/2) and set
